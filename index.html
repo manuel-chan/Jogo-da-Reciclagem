@@ -107,6 +107,25 @@
                 </div>
             </div>
         </div>
+        
+        <!-- Tela de Fim de Jogo (Vencedor) -->
+        <div id="winner-screen" class="hidden">
+            <h2 class="text-4xl font-bold text-yellow-500 mb-4">🎉 Fim de Jogo! 🎉</h2>
+            <p id="winner-text" class="text-gray-700 text-2xl mb-2">O vencedor é:</p>
+            <h3 id="winner-name" class="text-3xl font-bold text-green-700 mb-8"></h3>
+            
+            <div class="w-full max-w-md mx-auto bg-gray-50 p-4 rounded-lg border mb-8">
+                <h4 class="text-xl font-bold text-gray-800 mb-4 text-center">Placar Final</h4>
+                <div id="final-scoreboard-list" class="space-y-3">
+                    <!-- Placar final será inserido aqui -->
+                </div>
+            </div>
+
+            <button id="play-again-button" class="w-full max-w-md mx-auto bg-green-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg hover:bg-green-700 active:scale-95 transform transition duration-300 text-xl">
+                Jogar Novamente
+            </button>
+        </div>
+
 
     </div>
 
@@ -114,7 +133,7 @@
     <script type="module">
         // Importações do Firebase
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, collection, doc, setDoc, onSnapshot, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, doc, setDoc, onSnapshot, deleteDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
         // --- CONFIGURAÇÃO E INICIALIZAÇÃO ---
@@ -135,6 +154,7 @@
         const startScreen = document.getElementById('start-screen');
         const lobbyScreen = document.getElementById('lobby-screen');
         const gameScreen = document.getElementById('game-screen');
+        const winnerScreen = document.getElementById('winner-screen');
         const playerList = document.getElementById('player-list');
         const readyButton = document.getElementById('readyButton');
         const binsContainer = document.getElementById('bins-container');
@@ -143,6 +163,11 @@
         const gamePlayerName = document.getElementById('gamePlayerName');
         const scoreboardList = document.getElementById('scoreboard-list');
         const timerDisplay = document.getElementById('timer');
+        const winnerNameDisplay = document.getElementById('winner-name');
+        const winnerText = document.getElementById('winner-text');
+        const finalScoreboardList = document.getElementById('final-scoreboard-list');
+        const playAgainButton = document.getElementById('play-again-button');
+
 
         // --- ESTADO DO JOGO ---
         let currentPlayerId = null;
@@ -153,6 +178,7 @@
         let score = 0;
         let gameTimerInterval = null;
         let timeRemaining = 180; // 3 minutos em segundos
+        let isGameStarted = false;
 
         // --- DADOS DO JOGO ---
         const BINS_DATA = [
@@ -239,6 +265,7 @@
         }
         
         function checkAllReady(players) {
+            if (isGameStarted) return; 
             if (players.length > 0 && players.every(p => p.isReady)) {
                 if (unsubscribeLobby) unsubscribeLobby();
                 setTimeout(initializeGame, 1000); 
@@ -247,6 +274,7 @@
 
         // --- LÓGICA DO JOGO ---
         function initializeGame() {
+            isGameStarted = true; 
             lobbyScreen.classList.add('hidden');
             gameScreen.classList.remove('hidden');
             
@@ -300,9 +328,9 @@
             });
         }
 
-        function renderScoreboard(players) {
-            scoreboardList.innerHTML = '';
-            players.sort((a, b) => b.score - a.score); // Ordena do maior para o menor
+        function renderScoreboard(players, container = scoreboardList) {
+            container.innerHTML = '';
+            players.sort((a, b) => b.score - a.score);
             players.forEach(player => {
                 const scoreDiv = document.createElement('div');
                 scoreDiv.className = 'flex justify-between items-center bg-white p-2 rounded-md shadow-sm';
@@ -310,13 +338,13 @@
                     <span class="font-semibold text-gray-700">${player.name}</span>
                     <span class="font-bold text-lg ${player.id === currentPlayerId ? 'text-blue-600' : 'text-gray-800'}">${player.score}</span>
                 `;
-                scoreboardList.appendChild(scoreDiv);
+                container.appendChild(scoreDiv);
             });
         }
 
         function startGameTimer() {
             timeRemaining = 180;
-            updateTimerDisplay(); // Mostra o tempo inicial
+            updateTimerDisplay(); 
             gameTimerInterval = setInterval(() => {
                 timeRemaining--;
                 updateTimerDisplay();
@@ -364,7 +392,7 @@
 
             const id = e.dataTransfer.getData('text/plain');
             const draggableElement = document.getElementById(id);
-            if (!draggableElement) return;
+            if (!draggableElement || !isGameStarted) return;
             
             const droppedBin = e.target.closest('[data-bin-type]');
             if (!droppedBin) return;
@@ -389,21 +417,31 @@
             }
         }
         
-        function endGame(reason = 'waste_cleared') {
+        async function endGame(reason = 'waste_cleared') {
+            if (!isGameStarted) return;
+            isGameStarted = false; 
+
             clearInterval(gameTimerInterval);
             if (unsubscribeGame) unsubscribeGame();
 
-            const endMessage = reason === 'time_up'
-                ? `<h2 class="text-4xl font-bold text-red-700">Tempo Esgotado!</h2>`
-                : `<h2 class="text-4xl font-bold text-green-700">Fim de Jogo!</h2>`;
+            const querySnapshot = await getDocs(playersCollectionRef);
+            const finalPlayers = [];
+            querySnapshot.forEach(doc => finalPlayers.push(doc.data()));
 
-            gameScreen.innerHTML = `
-                ${endMessage}
-                <p class="text-gray-600 mt-4 text-2xl">Sua pontuação final foi: ${score}</p>
-                <div id="final-scoreboard" class="mt-6"></div>
-            `;
-            const finalScoreboard = document.getElementById('final-scoreboard');
-            finalScoreboard.appendChild(scoreboardList);
+            if (finalPlayers.length > 0) {
+                finalPlayers.sort((a, b) => b.score - a.score);
+                const highestScore = finalPlayers[0].score;
+                const winners = finalPlayers.filter(p => p.score === highestScore);
+                const winnerNames = winners.map(w => w.name).join(' e ');
+                
+                winnerText.textContent = winners.length > 1 ? "Os vencedores são:" : "O vencedor é:";
+                winnerNameDisplay.textContent = winnerNames;
+
+                renderScoreboard(finalPlayers, finalScoreboardList);
+            }
+
+            gameScreen.classList.add('hidden');
+            winnerScreen.classList.remove('hidden');
         }
 
         // --- LIMPEZA ---
@@ -423,6 +461,10 @@
             if (event.key === 'Enter') joinGame();
         });
         readyButton.addEventListener('click', handleReadyClick);
+        playAgainButton.addEventListener('click', () => {
+            // Recarrega a página para o jogador atual, a limpeza cuidará do Firestore
+            window.location.reload();
+        });
 
     </script>
 </body>
