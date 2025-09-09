@@ -70,8 +70,17 @@
                     if (user) {
                         userId = user.uid;
                         console.log('User signed in with ID:', userId);
-                        document.getElementById('welcome-screen').classList.remove('hidden');
                         setupRealtimeListeners(scoreChart);
+                        playButton.addEventListener('click', async () => {
+                            const playerName = document.getElementById('playerName').value;
+                            if (playerName.trim() !== '') {
+                                const playerRef = doc(db, `artifacts/${appId}/public/data/players`, userId);
+                                await setDoc(playerRef, { name: playerName, score: 0 });
+                                document.getElementById('welcome-screen').classList.add('hidden');
+                                document.getElementById('game-screen').classList.remove('hidden');
+                                shuffleItems();
+                            }
+                        });
                     } else {
                         console.log('Signing in...');
                         playButton.disabled = true;
@@ -81,18 +90,6 @@
                         } else {
                             await signInAnonymously(auth).catch(error => console.error("Firebase Auth Error:", error));
                         }
-                    }
-                });
-
-                const playButton = document.getElementById('playButton');
-                playButton.addEventListener('click', async () => {
-                    const playerName = document.getElementById('playerName').value;
-                    if (playerName.trim() !== '') {
-                        const playerRef = doc(db, `artifacts/${appId}/public/data/players`, userId);
-                        await setDoc(playerRef, { name: playerName, score: 0 });
-                        document.getElementById('welcome-screen').classList.add('hidden');
-                        document.getElementById('game-screen').classList.remove('hidden');
-                        shuffleItems();
                     }
                 });
 
