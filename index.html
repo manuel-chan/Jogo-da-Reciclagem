@@ -134,20 +134,28 @@
         // Importações do Firebase
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getFirestore, collection, doc, setDoc, onSnapshot, deleteDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-        // --- CONFIGURAÇÃO E INICIALIZAÇÃO ---
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { apiKey: "...", authDomain: "...", projectId: "..."};
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        // --- PASSO 2: CONFIGURAÇÃO DO FIREBASE ---
+        // ATENÇÃO: Substitua o objeto 'firebaseConfig' abaixo pelos dados do seu projeto Firebase.
+        // Você encontra isso nas configurações do seu projeto no console do Firebase.
+        const firebaseConfig = {
+            apiKey: "COLE_SUA_API_KEY_AQUI",
+            authDomain: "COLE_SEU_AUTH_DOMAIN_AQUI",
+            projectId: "COLE_SEU_PROJECT_ID_AQUI",
+            storageBucket: "COLE_SEU_STORAGE_BUCKET_AQUI",
+            messagingSenderId: "COLE_SEU_MESSAGING_SENDER_ID_AQUI",
+            appId: "COLE_SEU_APP_ID_AQUI"
+        };
 
+
+        // --- INICIALIZAÇÃO ---
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
-
-        const playersCollectionRef = collection(db, `/artifacts/${appId}/public/data/players`);
+        const playersCollectionRef = collection(db, 'jogo-reciclagem-players');
 
         // --- ELEMENTOS DA UI ---
-        const appContainer = document.getElementById('app-container');
         const enterButton = document.getElementById('enterButton');
         const playerNameInput = document.getElementById('playerName');
         const errorMessage = document.getElementById('error-message');
@@ -202,13 +210,12 @@
         // --- LÓGICA DE AUTENTICAÇÃO E LOBBY ---
         async function authenticateUser() {
             try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
+                await signInAnonymously(auth);
                 currentPlayerId = auth.currentUser.uid;
-            } catch (error) { console.error("Erro na autenticação:", error); }
+            } catch (error) { 
+                console.error("Erro na autenticação:", error); 
+                alert("Não foi possível conectar ao servidor do jogo. Verifique se as chaves do Firebase estão corretas no código.");
+            }
         }
 
         async function joinGame() {
@@ -220,7 +227,7 @@
             await authenticateUser();
             if (!currentPlayerId) return;
 
-            const playerDocRef = doc(db, `/artifacts/${appId}/public/data/players/${currentPlayerId}`);
+            const playerDocRef = doc(playersCollectionRef, currentPlayerId);
             await setDoc(playerDocRef, { name: currentPlayerName, isReady: false, score: 0 });
 
             startScreen.classList.add('hidden');
@@ -254,7 +261,7 @@
         async function handleReadyClick() {
             if (!currentPlayerId) return;
             isPlayerReady = !isPlayerReady;
-            const playerDocRef = doc(db, `/artifacts/${appId}/public/data/players/${currentPlayerId}`);
+            const playerDocRef = doc(playersCollectionRef, currentPlayerId);
             await setDoc(playerDocRef, { isReady: isPlayerReady }, { merge: true });
 
             readyButton.textContent = isPlayerReady ? 'Não estou pronto' : 'Pronto';
@@ -365,26 +372,11 @@
         }
 
         // --- FUNÇÕES DE ARRASTAR E SOLTAR (DRAG & DROP) ---
-        function handleDragStart(e) {
-            e.dataTransfer.setData('text/plain', e.target.id);
-            setTimeout(() => e.target.classList.add('dragging'), 0);
-        }
-
-        function handleDragEnd(e) {
-            e.target.classList.remove('dragging');
-        }
-
-        function handleDragOver(e) {
-            e.preventDefault();
-        }
-
-        function handleDragEnter(e) {
-            e.target.classList.add('drag-over');
-        }
-
-        function handleDragLeave(e) {
-            e.target.classList.remove('drag-over');
-        }
+        function handleDragStart(e) { e.dataTransfer.setData('text/plain', e.target.id); setTimeout(() => e.target.classList.add('dragging'), 0); }
+        function handleDragEnd(e) { e.target.classList.remove('dragging'); }
+        function handleDragOver(e) { e.preventDefault(); }
+        function handleDragEnter(e) { e.target.classList.add('drag-over'); }
+        function handleDragLeave(e) { e.target.classList.remove('drag-over'); }
 
         async function handleDrop(e) {
             e.preventDefault();
@@ -403,7 +395,7 @@
             if (itemType === binType) {
                 score++;
                 scoreDisplay.textContent = score;
-                const playerDocRef = doc(db, `/artifacts/${appId}/public/data/players/${currentPlayerId}`);
+                const playerDocRef = doc(playersCollectionRef, currentPlayerId);
                 await setDoc(playerDocRef, { score: score }, { merge: true });
             } else {
                 droppedBin.classList.add('animate-pulse', 'bg-red-700');
@@ -450,7 +442,7 @@
             if (unsubscribeLobby) unsubscribeLobby();
             if (unsubscribeGame) unsubscribeGame();
             if (currentPlayerId) {
-                const playerDocRef = doc(db, `/artifacts/${appId}/public/data/players/${currentPlayerId}`);
+                const playerDocRef = doc(playersCollectionRef, currentPlayerId);
                 await deleteDoc(playerDocRef);
             }
         });
@@ -461,12 +453,52 @@
             if (event.key === 'Enter') joinGame();
         });
         readyButton.addEventListener('click', handleReadyClick);
-        playAgainButton.addEventListener('click', () => {
-            // Recarrega a página para o jogador atual, a limpeza cuidará do Firestore
-            window.location.reload();
-        });
+        playAgainButton.addEventListener('click', () => { window.location.reload(); });
 
     </script>
 </body>
 </html>
+```
+
+---
+
+### Próximos Passos: Guia de Configuração (5 Minutos)
+
+Siga estes passos para que o jogo funcione no seu link do GitHub.
+
+**1. Crie um Projeto no Firebase**
+* Vá para o site do [Firebase](https://firebase.google.com/) e clique em "Começar".
+* Clique em "Adicionar projeto" e dê um nome a ele (ex: `jogo-reciclagem-online`).
+* Siga os passos de criação. Você pode desativar o Google Analytics se quiser.
+
+**2. Adicione seu Site ao Projeto Firebase**
+* Dentro do seu novo projeto, clique no ícone da web: **`</>`** (Adicionar um app da Web).
+* Dê um apelido ao seu app (ex: "Jogo") e clique em "Registrar app".
+* O Firebase vai te mostrar um objeto chamado `firebaseConfig`. **Copie todo esse código!**
+
+**3. Cole a Configuração no seu Código**
+* Volte ao seu arquivo `index.html`.
+* Encontre a seção que eu marquei como `PASSO 2: CONFIGURAÇÃO DO FIREBASE`.
+* **Substitua** o objeto `firebaseConfig` de exemplo pelo código que você copiou do Firebase.
+
+**4. Ative os Serviços no Firebase**
+No menu à esquerda do seu projeto Firebase:
+* **Authentication (Autenticação):**
+    * Vá para a aba "Sign-in method" (Método de login).
+    * Clique em "Anônimo" e ative-o. Isso permite que os jogadores entrem sem criar uma conta.
+* **Firestore Database (Banco de Dados):**
+    * Clique em "Criar banco de dados".
+    * Inicie em **modo de produção** e escolha o local do servidor (pode deixar o padrão).
+    * Após criar, vá para a aba **"Regras" (Rules)**.
+    * Substitua o conteúdo das regras por isto e clique em "Publicar":
+        ```javascript
+        rules_version = '2';
+        service cloud.firestore {
+          match /databases/{database}/documents {
+            match /jogo-reciclagem-players/{playerId} {
+              allow read, write: if true;
+            }
+          }
+        }
+        
 
