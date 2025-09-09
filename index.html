@@ -12,13 +12,15 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, onSnapshot, collection, query, updateDoc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+        // O Chart.js agora é carregado globalmente e não precisa ser importado.
+        // A variável Chart estará disponível após o script ser carregado.
+
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
         let db, auth;
         let userId;
-        let scoreChart;
 
         function shuffleArray(array) {
             for (let i = array.length - 1; i > 0; i--) {
@@ -27,70 +29,62 @@
             }
         }
 
-        async function initGame() {
-            const hasFirebase = Object.keys(firebaseConfig).length > 0;
-            const playButton = document.getElementById('playButton');
-            const welcomeScreen = document.getElementById('welcome-screen');
-            const gameScreen = document.getElementById('game-screen');
-            const scoreSection = document.getElementById('scoreboard-section');
-
-            if (!hasFirebase) {
-                console.warn("Firebase não inicializado. O jogo rodará em modo offline.");
-                scoreSection.classList.add('hidden');
-                playButton.addEventListener('click', () => {
-                    const playerName = document.getElementById('playerName').value;
-                    if (playerName.trim() !== '') {
-                        welcomeScreen.classList.add('hidden');
-                        gameScreen.classList.remove('hidden');
-                        shuffleItems();
-                    }
-                });
-            } else {
-                const chartScript = document.createElement('script');
-                chartScript.src = "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js";
-                chartScript.onload = () => {
-                    const scoreChartCtx = document.getElementById('scoreChart').getContext('2d');
-                    scoreChart = new Chart(scoreChartCtx, {
-                        type: 'bar',
-                        data: {
-                            labels: [],
-                            datasets: [{
-                                label: 'Pontuação',
-                                data: [],
-                                backgroundColor: 'rgba(75, 192, 192, 0.6)',
-                                borderColor: 'rgba(75, 192, 192, 1)',
-                                borderWidth: 1
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            scales: {
-                                y: {
-                                    beginAtZero: true
-                                }
-                            }
-                        }
-                    });
-                };
-                document.head.appendChild(chartScript);
-
+        document.addEventListener('DOMContentLoaded', () => {
+            // Carrega o Chart.js dinamicamente para garantir que ele esteja disponível
+            const chartScript = document.createElement('script');
+            chartScript.src = "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js";
+            chartScript.onload = () => {
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
 
-                playButton.disabled = true;
-                playButton.textContent = "Carregando...";
+                const scoreChartCtx = document.getElementById('scoreChart').getContext('2d');
+                let scoreChart = new Chart(scoreChartCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: [],
+                        datasets: [{
+                            label: 'Pontuação',
+                            data: [],
+                            backgroundColor: 'rgba(75, 192, 192, 0.6)',
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
 
+                // Use onAuthStateChanged to ensure auth is ready before proceeding
                 onAuthStateChanged(auth, async (user) => {
+                    const playButton = document.getElementById('playButton');
                     playButton.disabled = false;
                     playButton.textContent = "Entrar";
 
                     if (user) {
                         userId = user.uid;
                         console.log('User signed in with ID:', userId);
-                        setupRealtimeListeners();
+                        setupRealtimeListeners(scoreChart);
+                        playButton.addEventListener('click', async () => {
+                            const playerName = document.getElementById('playerName').value;
+                            if (playerName.trim() !== '') {
+                                const playerRef = doc(db, `artifacts/${appId}/public/data/players`, userId);
+                                await setDoc(playerRef, { name: playerName, score: 0 });
+                                document.getElementById('welcome-screen').classList.add('hidden');
+                                document.getElementById('game-screen').classList.remove('hidden');
+                                shuffleItems();
+                            }
+                        });
                     } else {
                         console.log('Signing in...');
+                        playButton.disabled = true;
+                        playButton.textContent = "Carregando...";
                         if (initialAuthToken) {
                             await signInWithCustomToken(auth, initialAuthToken).catch(error => console.error("Firebase Auth Error:", error));
                         } else {
@@ -99,65 +93,55 @@
                     }
                 });
 
-                playButton.addEventListener('click', async () => {
-                    const playerName = document.getElementById('playerName').value;
-                    if (playerName.trim() !== '' && userId) {
-                        const playerRef = doc(db, `artifacts/${appId}/public/data/players`, userId);
-                        await setDoc(playerRef, { name: playerName, score: 0 });
-                        welcomeScreen.classList.add('hidden');
-                        gameScreen.classList.remove('hidden');
-                        shuffleItems();
-                    }
-                });
-            }
-        }
-
-        document.addEventListener('DOMContentLoaded', initGame);
-
-        function shuffleItems() {
-            const itemsContainer = document.getElementById('items-container');
-            const items = Array.from(itemsContainer.children);
-            shuffleArray(items);
-            items.forEach(item => itemsContainer.appendChild(item));
-        }
-
-        const items = document.querySelectorAll('.draggable');
-        const bins = document.querySelectorAll('.droppable');
-
-        items.forEach(item => {
-            item.addEventListener('dragstart', (e) => {
-                e.dataTransfer.setData('text/plain', e.target.id);
-                setTimeout(() => e.target.classList.add('hidden'), 0);
-            });
-        });
-
-        bins.forEach(bin => {
-            bin.addEventListener('dragover', (e) => e.preventDefault());
-            bin.addEventListener('drop', (e) => {
-                e.preventDefault();
-                const itemId = e.dataTransfer.getData('text/plain');
-                const item = document.getElementById(itemId);
-                const itemsContainer = document.getElementById('items-container');
-
-                if (item.dataset.type === bin.dataset.type) {
-                    // Correct drop
-                    updatePlayerScore(10);
-                    item.parentNode.removeChild(item);
-                    const checkmark = document.getElementById('checkmark');
-                    checkmark.classList.remove('hidden');
-                    setTimeout(() => checkmark.classList.add('hidden'), 500);
-                } else {
-                    // Incorrect drop
-                    item.classList.remove('hidden');
-                    itemsContainer.appendChild(item);
-                    const crossmark = document.getElementById('crossmark');
-                    crossmark.classList.remove('hidden');
-                    setTimeout(() => crossmark.classList.add('hidden'), 500);
+                function shuffleItems() {
+                    const itemsContainer = document.getElementById('items-container');
+                    const items = Array.from(itemsContainer.children);
+                    shuffleArray(items);
+                    items.forEach(item => itemsContainer.appendChild(item));
                 }
-            });
+
+                // Drag and Drop Logic
+                const items = document.querySelectorAll('.draggable');
+                const bins = document.querySelectorAll('.droppable');
+
+                items.forEach(item => {
+                    item.addEventListener('dragstart', (e) => {
+                        e.dataTransfer.setData('text/plain', e.target.id);
+                        setTimeout(() => e.target.classList.add('hidden'), 0);
+                    });
+                });
+
+                bins.forEach(bin => {
+                    bin.addEventListener('dragover', (e) => e.preventDefault());
+                    bin.addEventListener('drop', (e) => {
+                        e.preventDefault();
+                        const itemId = e.dataTransfer.getData('text/plain');
+                        const item = document.getElementById(itemId);
+                        const itemsContainer = document.getElementById('items-container');
+
+                        if (item.dataset.type === bin.dataset.type) {
+                            // Correct drop
+                            updatePlayerScore(10);
+                            item.parentNode.removeChild(item);
+                            // Show a temporary success message/animation
+                            const checkmark = document.getElementById('checkmark');
+                            checkmark.classList.remove('hidden');
+                            setTimeout(() => checkmark.classList.add('hidden'), 500);
+                        } else {
+                            // Incorrect drop, return item to original position and show error
+                            item.classList.remove('hidden');
+                            itemsContainer.appendChild(item); // Retorna o item para a área de itens
+                            const crossmark = document.getElementById('crossmark');
+                            crossmark.classList.remove('hidden');
+                            setTimeout(() => crossmark.classList.add('hidden'), 500);
+                        }
+                    });
+                });
+            };
+            document.head.appendChild(chartScript);
         });
 
-        async function setupRealtimeListeners() {
+        async function setupRealtimeListeners(scoreChart) {
             if (!db) {
                 console.error("Firestore não inicializado.");
                 return;
@@ -168,7 +152,7 @@
                 querySnapshot.forEach((doc) => {
                     players[doc.id] = doc.data();
                 });
-                updateScoreboard(players);
+                updateScoreboard(players, scoreChart);
             });
         }
 
@@ -190,7 +174,7 @@
             }
         }
 
-        function updateScoreboard(players) {
+        function updateScoreboard(players, scoreChart) {
             const scoreboard = document.getElementById('scoreboard-list');
             const sortedPlayers = Object.values(players).sort((a, b) => b.score - a.score);
             scoreboard.innerHTML = sortedPlayers.map(p => `
@@ -200,13 +184,12 @@
                 </li>
             `).join('');
 
-            if (scoreChart) {
-                const names = sortedPlayers.map(p => p.name);
-                const scores = sortedPlayers.map(p => p.score);
-                scoreChart.data.labels = names;
-                scoreChart.data.datasets[0].data = scores;
-                scoreChart.update();
-            }
+            // Update Chart
+            const names = sortedPlayers.map(p => p.name);
+            const scores = sortedPlayers.map(p => p.score);
+            scoreChart.data.labels = names;
+            scoreChart.data.datasets[0].data = scores;
+            scoreChart.update();
         }
     </script>
 </head>
@@ -369,7 +352,7 @@
             </div>
 
             <!-- Scoreboard and Graph -->
-            <div id="scoreboard-section" class="w-full lg:w-1/3 flex flex-col gap-8">
+            <div class="w-full lg:w-1/3 flex flex-col gap-8">
                 <!-- Scoreboard -->
                 <div class="bg-white p-6 rounded-2xl shadow-xl flex-1">
                     <h3 class="text-2xl font-bold mb-4 text-center">Placar</h3>
