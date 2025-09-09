@@ -35,25 +35,20 @@
             const playButton = document.getElementById('playButton');
             const welcomeScreen = document.getElementById('welcome-screen');
             const gameScreen = document.getElementById('game-screen');
+            const lobbyScreen = document.getElementById('lobby-screen');
             const scoreboardList = document.getElementById('scoreboard-list');
             const playerNameInput = document.getElementById('playerName');
+            const startLobbyButton = document.getElementById('startLobbyButton');
 
             playerNameInput.addEventListener('input', () => {
                 playButton.disabled = playerNameInput.value.trim() === '';
             });
             
             if (!hasFirebase) {
-                console.warn("Firebase não inicializado. O jogo rodará em modo offline.");
-                playButton.addEventListener('click', () => {
-                    const playerName = playerNameInput.value;
-                    if (playerName.trim() !== '') {
-                        welcomeScreen.classList.add('hidden');
-                        gameScreen.classList.remove('hidden');
-                        document.getElementById('playerNameDisplay').textContent = playerName;
-                        shuffleItems();
-                        startTimer();
-                    }
-                });
+                console.error("Erro: Firebase não inicializado. O jogo precisa de uma conexão com o banco de dados para funcionar.");
+                playButton.disabled = true;
+                playButton.textContent = "Erro: Jogo offline";
+                return;
             } else {
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
@@ -87,11 +82,16 @@
                         const playerRef = doc(db, `artifacts/${appId}/public/data/players`, userId);
                         await setDoc(playerRef, { name: playerName, score: 0 });
                         welcomeScreen.classList.add('hidden');
-                        gameScreen.classList.remove('hidden');
+                        lobbyScreen.classList.remove('hidden');
                         document.getElementById('playerNameDisplay').textContent = playerName;
-                        shuffleItems();
-                        startTimer();
                     }
+                });
+
+                startLobbyButton.addEventListener('click', () => {
+                    lobbyScreen.classList.add('hidden');
+                    gameScreen.classList.remove('hidden');
+                    shuffleItems();
+                    startTimer();
                 });
             }
         }
@@ -225,13 +225,13 @@
             <p class="mb-6 text-center">Entre com seu nome para começar a jogar.</p>
             <input type="text" id="playerName" placeholder="Seu nome" class="w-full p-3 mb-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
             <button id="playButton" class="w-full py-3 bg-green-500 text-white font-bold rounded-lg shadow-md hover:bg-green-600 transition-colors">Entrar</button>
-            
-            <div id="players-online-section" class="w-full mt-6">
-                <h3 class="text-xl font-bold mb-2 text-center">Jogadores Online</h3>
-                <ul id="players-list" class="space-y-2">
-                    <!-- Player names will be rendered here -->
-                </ul>
-            </div>
+        </div>
+        
+        <!-- Lobby Screen -->
+        <div id="lobby-screen" class="hidden flex-col items-center justify-center p-8 bg-white rounded-2xl shadow-xl w-full max-w-md">
+            <h2 class="text-2xl font-bold mb-4 text-center">Jogadores Online</h2>
+            <ul id="players-list" class="space-y-2 mb-6 w-full"></ul>
+            <button id="startLobbyButton" class="w-full py-3 bg-blue-500 text-white font-bold rounded-lg shadow-md hover:bg-blue-600 transition-colors">Iniciar Jogo</button>
         </div>
 
         <!-- Game Screen -->
