@@ -47,34 +47,6 @@
                     }
                 });
             } else {
-                const chartScript = document.createElement('script');
-                chartScript.src = "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js";
-                chartScript.onload = () => {
-                    const scoreChartCtx = document.getElementById('scoreChart').getContext('2d');
-                    scoreChart = new Chart(scoreChartCtx, {
-                        type: 'bar',
-                        data: {
-                            labels: [],
-                            datasets: [{
-                                label: 'Pontuação',
-                                data: [],
-                                backgroundColor: 'rgba(75, 192, 192, 0.6)',
-                                borderColor: 'rgba(75, 192, 192, 1)',
-                                borderWidth: 1
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            scales: {
-                                y: {
-                                    beginAtZero: true
-                                }
-                            }
-                        }
-                    });
-                };
-                document.head.appendChild(chartScript);
-
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
@@ -200,14 +172,6 @@
                     <span class="text-lg font-bold text-green-600">${p.score}</span>
                 </li>
             `).join('');
-
-            if (scoreChart) {
-                const names = sortedPlayers.map(p => p.name);
-                const scores = sortedPlayers.map(p => p.score);
-                scoreChart.data.labels = names;
-                scoreChart.data.datasets[0].data = scores;
-                scoreChart.update();
-            }
         }
     </script>
 </head>
@@ -377,12 +341,6 @@
                     <ul id="scoreboard-list" class="space-y-2">
                         <!-- Scoreboard items will be rendered here -->
                     </ul>
-                </div>
-
-                <!-- Graph -->
-                <div class="bg-white p-6 rounded-2xl shadow-xl flex-1">
-                    <h3 class="text-2xl font-bold mb-4 text-center">Progresso</h3>
-                    <canvas id="scoreChart"></canvas>
                 </div>
             </div>
         </div>
