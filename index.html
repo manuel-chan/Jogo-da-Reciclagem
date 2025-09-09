@@ -20,6 +20,8 @@
         let userId;
         let scoreChart;
         let isGameReady = false;
+        let gameTimer = 120; // 2 minutes in seconds
+        let timerInterval;
 
         function shuffleArray(array) {
             for (let i = array.length - 1; i > 0; i--) {
@@ -47,7 +49,9 @@
                     if (playerName.trim() !== '') {
                         welcomeScreen.classList.add('hidden');
                         gameScreen.classList.remove('hidden');
+                        document.getElementById('playerNameDisplay').textContent = playerName;
                         shuffleItems();
+                        startTimer();
                     }
                 });
             } else {
@@ -84,7 +88,9 @@
                         await setDoc(playerRef, { name: playerName, score: 0 });
                         welcomeScreen.classList.add('hidden');
                         gameScreen.classList.remove('hidden');
+                        document.getElementById('playerNameDisplay').textContent = playerName;
                         shuffleItems();
+                        startTimer();
                     }
                 });
             }
@@ -97,6 +103,25 @@
             const items = Array.from(itemsContainer.children);
             shuffleArray(items);
             items.forEach(item => itemsContainer.appendChild(item));
+        }
+
+        function startTimer() {
+            const timerElement = document.getElementById('timer');
+            timerInterval = setInterval(() => {
+                gameTimer--;
+                const minutes = Math.floor(gameTimer / 60);
+                const seconds = gameTimer % 60;
+                timerElement.textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+                if (gameTimer <= 0) {
+                    endGame();
+                }
+            }, 1000);
+        }
+
+        function endGame() {
+            clearInterval(timerInterval);
+            document.getElementById('game-screen').classList.add('hidden');
+            document.getElementById('end-game-screen').classList.remove('hidden');
         }
 
         const items = document.querySelectorAll('.draggable');
@@ -211,32 +236,34 @@
         <div id="game-screen" class="hidden w-full max-w-7xl flex flex-col lg:flex-row gap-8">
             <!-- Game Area -->
             <div class="w-full lg:w-2/3 bg-white p-6 rounded-2xl shadow-xl flex flex-col items-center">
+                <div class="flex items-center justify-between w-full mb-4">
+                    <div class="text-xl font-bold text-gray-700">
+                        Jogador: <span id="playerNameDisplay" class="text-blue-600"></span>
+                    </div>
+                    <div class="text-xl font-bold text-gray-700">
+                        Tempo: <span id="timer" class="text-red-600">2:00</span>
+                    </div>
+                </div>
                 <h2 class="text-3xl font-bold mb-6 text-center">Qual é a lixeira correta?</h2>
                 <div class="w-full grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-8 justify-items-center">
                     <!-- Lixeiras -->
                     <div class="flex flex-col items-center droppable p-2 rounded-lg" data-type="plastic">
-                        <img src="https://placehold.co/100x150/ef4444/ffffff?text=Plastico" alt="Lixeira Vermelha" class="w-16 h-24 mb-2 rounded-lg">
-                        <span class="text-sm font-semibold text-center">Plástico</span>
+                        <div class="w-16 h-24 mb-2 rounded-lg" style="background-color: #ef4444;"></div>
                     </div>
                     <div class="flex flex-col items-center droppable p-2 rounded-lg" data-type="paper">
-                        <img src="https://placehold.co/100x150/3b82f6/ffffff?text=Papel" alt="Lixeira Azul" class="w-16 h-24 mb-2 rounded-lg">
-                        <span class="text-sm font-semibold text-center">Papel</span>
+                        <div class="w-16 h-24 mb-2 rounded-lg" style="background-color: #3b82f6;"></div>
                     </div>
                     <div class="flex flex-col items-center droppable p-2 rounded-lg" data-type="metal">
-                        <img src="https://placehold.co/100x150/f59e0b/ffffff?text=Metal" alt="Lixeira Amarela" class="w-16 h-24 mb-2 rounded-lg">
-                        <span class="text-sm font-semibold text-center">Metal</span>
+                        <div class="w-16 h-24 mb-2 rounded-lg" style="background-color: #f59e0b;"></div>
                     </div>
                     <div class="flex flex-col items-center droppable p-2 rounded-lg" data-type="glass">
-                        <img src="https://placehold.co/100x150/22c55e/ffffff?text=Vidro" alt="Lixeira Verde" class="w-16 h-24 mb-2 rounded-lg">
-                        <span class="text-sm font-semibold text-center">Vidro</span>
+                        <div class="w-16 h-24 mb-2 rounded-lg" style="background-color: #22c55e;"></div>
                     </div>
                     <div class="flex flex-col items-center droppable p-2 rounded-lg" data-type="organic">
-                         <img src="https://placehold.co/100x150/92400e/ffffff?text=Organico" alt="Lixeira Marrom" class="w-16 h-24 mb-2 rounded-lg">
-                        <span class="text-sm font-semibold text-center">Orgânico</span>
+                         <div class="w-16 h-24 mb-2 rounded-lg" style="background-color: #92400e;"></div>
                     </div>
                     <div class="flex flex-col items-center droppable p-2 rounded-lg" data-type="non-recyclable">
-                        <img src="https://placehold.co/100x150/333333/ffffff?text=Nao-Reciclavel" alt="Lixeira Preta" class="w-16 h-24 mb-2 rounded-lg">
-                        <span class="text-sm font-semibold text-center">Não-Reciclável</span>
+                        <div class="w-16 h-24 mb-2 rounded-lg" style="background-color: #333333;"></div>
                     </div>
                 </div>
 
@@ -259,6 +286,14 @@
                         <span class="text-xl">🧴</span>
                         <p class="text-xs text-center mt-1">Pote de shampoo</p>
                     </div>
+                    <div id="item-plastic-5" class="draggable p-3 rounded-lg cursor-grab active:cursor-grabbing transform transition-transform hover:scale-105" draggable="true" data-type="plastic">
+                        <span class="text-xl">🥡</span>
+                        <p class="text-xs text-center mt-1">Embalagem de comida</p>
+                    </div>
+                    <div id="item-plastic-6" class="draggable p-3 rounded-lg cursor-grab active:cursor-grabbing transform transition-transform hover:scale-105" draggable="true" data-type="plastic">
+                        <span class="text-xl">🧸</span>
+                        <p class="text-xs text-center mt-1">Brinquedo</p>
+                    </div>
 
                     <!-- Itens de Papel -->
                     <div id="item-paper-1" class="draggable p-3 rounded-lg cursor-grab active:cursor-grabbing transform transition-transform hover:scale-105" draggable="true" data-type="paper">
@@ -272,6 +307,18 @@
                     <div id="item-paper-3" class="draggable p-3 rounded-lg cursor-grab active:cursor-grabbing transform transition-transform hover:scale-105" draggable="true" data-type="paper">
                         <span class="text-xl">📄</span>
                         <p class="text-xs text-center mt-1">Folha de papel</p>
+                    </div>
+                    <div id="item-paper-4" class="draggable p-3 rounded-lg cursor-grab active:cursor-grabbing transform transition-transform hover:scale-105" draggable="true" data-type="paper">
+                        <span class="text-xl">✉️</span>
+                        <p class="text-xs text-center mt-1">Envelope</p>
+                    </div>
+                    <div id="item-paper-5" class="draggable p-3 rounded-lg cursor-grab active:cursor-grabbing transform transition-transform hover:scale-105" draggable="true" data-type="paper">
+                        <span class="text-xl">📖</span>
+                        <p class="text-xs text-center mt-1">Revista</p>
+                    </div>
+                    <div id="item-paper-6" class="draggable p-3 rounded-lg cursor-grab active:cursor-grabbing transform transition-transform hover:scale-105" draggable="true" data-type="paper">
+                        <span class="text-xl">🛒</span>
+                        <p class="text-xs text-center mt-1">Saco de papel</p>
                     </div>
 
                     <!-- Itens de Metal -->
@@ -287,6 +334,18 @@
                         <span class="text-xl">🔩</span>
                         <p class="text-xs text-center mt-1">Arame</p>
                     </div>
+                    <div id="item-metal-4" class="draggable p-3 rounded-lg cursor-grab active:cursor-grabbing transform transition-transform hover:scale-105" draggable="true" data-type="metal">
+                        <span class="text-xl">🔑</span>
+                        <p class="text-xs text-center mt-1">Chave velha</p>
+                    </div>
+                    <div id="item-metal-5" class="draggable p-3 rounded-lg cursor-grab active:cursor-grabbing transform transition-transform hover:scale-105" draggable="true" data-type="metal">
+                        <span class="text-xl">🍴</span>
+                        <p class="text-xs text-center mt-1">Talher</p>
+                    </div>
+                    <div id="item-metal-6" class="draggable p-3 rounded-lg cursor-grab active:cursor-grabbing transform transition-transform hover:scale-105" draggable="true" data-type="metal">
+                        <span class="text-xl">🔗</span>
+                        <p class="text-xs text-center mt-1">Clipes</p>
+                    </div>
 
                     <!-- Itens de Vidro -->
                     <div id="item-glass-1" class="draggable p-3 rounded-lg cursor-grab active:cursor-grabbing transform transition-transform hover:scale-105" draggable="true" data-type="glass">
@@ -300,6 +359,18 @@
                     <div id="item-glass-3" class="draggable p-3 rounded-lg cursor-grab active:cursor-grabbing transform transition-transform hover:scale-105" draggable="true" data-type="glass">
                         <span class="text-xl">🥂</span>
                         <p class="text-xs text-center mt-1">Copo de vidro</p>
+                    </div>
+                    <div id="item-glass-4" class="draggable p-3 rounded-lg cursor-grab active:cursor-grabbing transform transition-transform hover:scale-105" draggable="true" data-type="glass">
+                        <span class="text-xl">🏺</span>
+                        <p class="text-xs text-center mt-1">Jarra de vidro</p>
+                    </div>
+                    <div id="item-glass-5" class="draggable p-3 rounded-lg cursor-grab active:cursor-grabbing transform transition-transform hover:scale-105" draggable="true" data-type="glass">
+                        <span class="text-xl">🍾</span>
+                        <p class="text-xs text-center mt-1">Garrafa de azeite</p>
+                    </div>
+                    <div id="item-glass-6" class="draggable p-3 rounded-lg cursor-grab active:cursor-grabbing transform transition-transform hover:scale-105" draggable="true" data-type="glass">
+                        <span class="text-xl">🥛</span>
+                        <p class="text-xs text-center mt-1">Frasco de perfume</p>
                     </div>
 
                     <!-- Itens Orgânicos -->
@@ -319,6 +390,14 @@
                         <span class="text-xl">🍗</span>
                         <p class="text-xs text-center mt-1">Restos de comida</p>
                     </div>
+                    <div id="item-organic-5" class="draggable p-3 rounded-lg cursor-grab active:cursor-grabbing transform transition-transform hover:scale-105" draggable="true" data-type="organic">
+                        <span class="text-xl">☕</span>
+                        <p class="text-xs text-center mt-1">Borra de café</p>
+                    </div>
+                    <div id="item-organic-6" class="draggable p-3 rounded-lg cursor-grab active:cursor-grabbing transform transition-transform hover:scale-105" draggable="true" data-type="organic">
+                        <span class="text-xl">🥚</span>
+                        <p class="text-xs text-center mt-1">Casca de ovo</p>
+                    </div>
 
                     <!-- Itens Não-Recicláveis -->
                     <div id="item-non-recyclable-1" class="draggable p-3 rounded-lg cursor-grab active:cursor-grabbing transform transition-transform hover:scale-105" draggable="true" data-type="non-recyclable">
@@ -336,6 +415,14 @@
                     <div id="item-non-recyclable-4" class="draggable p-3 rounded-lg cursor-grab active:cursor-grabbing transform transition-transform hover:scale-105" draggable="true" data-type="non-recyclable">
                         <span class="text-xl">🚼</span>
                         <p class="text-xs text-center mt-1">Fralda</p>
+                    </div>
+                    <div id="item-non-recyclable-5" class="draggable p-3 rounded-lg cursor-grab active:cursor-grabbing transform transition-transform hover:scale-105" draggable="true" data-type="non-recyclable">
+                        <span class="text-xl">🦴</span>
+                        <p class="text-xs text-center mt-1">Restos de osso</p>
+                    </div>
+                    <div id="item-non-recyclable-6" class="draggable p-3 rounded-lg cursor-grab active:cursor-grabbing transform transition-transform hover:scale-105" draggable="true" data-type="non-recyclable">
+                        <span class="text-xl">🚬</span>
+                        <p class="text-xs text-center mt-1">Bituca de cigarro</p>
                     </div>
                 </div>
 
@@ -363,6 +450,12 @@
                     </ul>
                 </div>
             </div>
+        </div>
+
+        <!-- End Game Screen -->
+        <div id="end-game-screen" class="hidden flex-col items-center justify-center p-8 bg-white rounded-2xl shadow-xl w-full max-w-md mt-8">
+            <h2 class="text-3xl font-bold mb-4 text-center text-red-600">Fim de Jogo!</h2>
+            <p class="mb-6 text-center text-lg">O tempo acabou. Veja sua pontuação final no placar.</p>
         </div>
     </div>
 </body>
