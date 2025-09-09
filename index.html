@@ -140,12 +140,12 @@
         // ATENÇÃO: Substitua o objeto 'firebaseConfig' abaixo pelos dados do seu projeto Firebase.
         // Você encontra isso nas configurações do seu projeto no console do Firebase.
         const firebaseConfig = {
-            apiKey: "COLE_SUA_API_KEY_AQUI",
-            authDomain: "COLE_SEU_AUTH_DOMAIN_AQUI",
-            projectId: "COLE_SEU_PROJECT_ID_AQUI",
-            storageBucket: "COLE_SEU_STORAGE_BUCKET_AQUI",
-            messagingSenderId: "COLE_SEU_MESSAGING_SENDER_ID_AQUI",
-            appId: "COLE_SEU_APP_ID_AQUI"
+            apiKey: "AIzaSyCXSJ6EajgPB-0Yg96vQpncW--0rK5I9Y",
+            authDomain: "jogo-de-reciclagem.firebaseapp.com",
+            projectId: "jogo-de-reciclagem",
+            storageBucket: "jogo-de-reciclagem.appspot.com",
+            messagingSenderId: "187212661454",
+            appId: "1:187212661454:web:26fb5f7f11499bd297869f"
         };
 
 
@@ -458,47 +458,4 @@
     </script>
 </body>
 </html>
-```
-
----
-
-### Próximos Passos: Guia de Configuração (5 Minutos)
-
-Siga estes passos para que o jogo funcione no seu link do GitHub.
-
-**1. Crie um Projeto no Firebase**
-* Vá para o site do [Firebase](https://firebase.google.com/) e clique em "Começar".
-* Clique em "Adicionar projeto" e dê um nome a ele (ex: `jogo-reciclagem-online`).
-* Siga os passos de criação. Você pode desativar o Google Analytics se quiser.
-
-**2. Adicione seu Site ao Projeto Firebase**
-* Dentro do seu novo projeto, clique no ícone da web: **`</>`** (Adicionar um app da Web).
-* Dê um apelido ao seu app (ex: "Jogo") e clique em "Registrar app".
-* O Firebase vai te mostrar um objeto chamado `firebaseConfig`. **Copie todo esse código!**
-
-**3. Cole a Configuração no seu Código**
-* Volte ao seu arquivo `index.html`.
-* Encontre a seção que eu marquei como `PASSO 2: CONFIGURAÇÃO DO FIREBASE`.
-* **Substitua** o objeto `firebaseConfig` de exemplo pelo código que você copiou do Firebase.
-
-**4. Ative os Serviços no Firebase**
-No menu à esquerda do seu projeto Firebase:
-* **Authentication (Autenticação):**
-    * Vá para a aba "Sign-in method" (Método de login).
-    * Clique em "Anônimo" e ative-o. Isso permite que os jogadores entrem sem criar uma conta.
-* **Firestore Database (Banco de Dados):**
-    * Clique em "Criar banco de dados".
-    * Inicie em **modo de produção** e escolha o local do servidor (pode deixar o padrão).
-    * Após criar, vá para a aba **"Regras" (Rules)**.
-    * Substitua o conteúdo das regras por isto e clique em "Publicar":
-        ```javascript
-        rules_version = '2';
-        service cloud.firestore {
-          match /databases/{database}/documents {
-            match /jogo-reciclagem-players/{playerId} {
-              allow read, write: if true;
-            }
-          }
-        }
-        
 
