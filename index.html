@@ -33,12 +33,13 @@
             const welcomeScreen = document.getElementById('welcome-screen');
             const gameScreen = document.getElementById('game-screen');
             const scoreSection = document.getElementById('scoreboard-section');
+            const playerNameInput = document.getElementById('playerName');
 
             if (!hasFirebase) {
                 console.warn("Firebase não inicializado. O jogo rodará em modo offline.");
                 scoreSection.classList.add('hidden');
                 playButton.addEventListener('click', () => {
-                    const playerName = document.getElementById('playerName').value;
+                    const playerName = playerNameInput.value;
                     if (playerName.trim() !== '') {
                         welcomeScreen.classList.add('hidden');
                         gameScreen.classList.remove('hidden');
@@ -100,7 +101,7 @@
                 });
 
                 playButton.addEventListener('click', async () => {
-                    const playerName = document.getElementById('playerName').value;
+                    const playerName = playerNameInput.value;
                     if (playerName.trim() !== '' && userId) {
                         const playerRef = doc(db, `artifacts/${appId}/public/data/players`, userId);
                         await setDoc(playerRef, { name: playerName, score: 0 });
