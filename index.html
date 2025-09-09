@@ -1,177 +1,362 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Jogo da Reciclagem</title>
-<!-- Tailwind CSS -->
-<script src="https://cdn.tailwindcss.com"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jogo da Reciclagem</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Firebase -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, onSnapshot, collection, query, updateDoc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-<!-- Configuração Firebase -->
-<script>
-const __firebase_config = {
-  apiKey: "SUA_API_KEY",
-  authDomain: "SEU_PROJECT.firebaseapp.com",
-  projectId: "SEU_PROJECT_ID",
-  storageBucket: "SEU_PROJECT.appspot.com",
-  messagingSenderId: "SEU_MESSAGING_SENDER_ID",
-  appId: "SEU_APP_ID"
-};
-const __initial_auth_token = null; // Use null para login anônimo
-const __app_id = "jogo-reciclagem";
-</script>
+        // O Chart.js agora é carregado globalmente e não precisa ser importado.
+        // A variável Chart estará disponível após o script ser carregado.
 
-<!-- Firebase + Game Logic -->
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, doc, onSnapshot, collection, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
-let db, auth, userId;
+        let db, auth;
+        let userId;
 
-function shuffleArray(array) {
-  for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [array[i], array[j]] = [array[j], array[i]];
-  }
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-  const chartScript = document.createElement('script');
-  chartScript.src = "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js";
-  chartScript.onload = () => {
-    const app = initializeApp(__firebase_config);
-    db = getFirestore(app);
-    auth = getAuth(app);
-
-    const scoreChartCtx = document.getElementById('scoreChart').getContext('2d');
-    let scoreChart = new Chart(scoreChartCtx, {
-      type: 'bar',
-      data: { labels: [], datasets: [{ label: 'Pontuação', data: [], backgroundColor: 'rgba(75, 192, 192, 0.6)', borderColor: 'rgba(75, 192, 192, 1)', borderWidth: 1 }] },
-      options: { responsive: true, scales: { y: { beginAtZero: true } } }
-    });
-
-    onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        userId = user.uid;
-        document.getElementById('welcome-screen').classList.remove('hidden');
-        setupRealtimeListeners(scoreChart);
-      } else {
-        if (__initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token).catch(console.error);
-        } else {
-          await signInAnonymously(auth).catch(console.error);
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
         }
-      }
-    });
 
-    document.getElementById('playButton').addEventListener('click', async () => {
-      const playerName = document.getElementById('playerName').value.trim();
-      if (playerName) {
-        const playerRef = doc(db, `artifacts/${__app_id}/public/data/players`, userId);
-        await setDoc(playerRef, { name: playerName, score: 0 });
-        document.getElementById('welcome-screen').classList.add('hidden');
-        document.getElementById('game-screen').classList.remove('hidden');
-        shuffleItems();
-      }
-    });
+        document.addEventListener('DOMContentLoaded', () => {
+            // Carrega o Chart.js dinamicamente para garantir que ele esteja disponível
+            const chartScript = document.createElement('script');
+            chartScript.src = "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js";
+            chartScript.onload = () => {
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
 
-    function shuffleItems() {
-      const itemsContainer = document.getElementById('items-container');
-      const items = Array.from(itemsContainer.children);
-      shuffleArray(items);
-      items.forEach(item => itemsContainer.appendChild(item));
-    }
+                const scoreChartCtx = document.getElementById('scoreChart').getContext('2d');
+                let scoreChart = new Chart(scoreChartCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: [],
+                        datasets: [{
+                            label: 'Pontuação',
+                            data: [],
+                            backgroundColor: 'rgba(75, 192, 192, 0.6)',
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
 
-    const items = document.querySelectorAll('.draggable');
-    const bins = document.querySelectorAll('.droppable');
+                // Use onAuthStateChanged to ensure auth is ready before proceeding
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        console.log('User signed in with ID:', userId);
+                        document.getElementById('welcome-screen').classList.remove('hidden');
+                        setupRealtimeListeners(scoreChart);
+                    } else {
+                        console.log('Signing in...');
+                        if (initialAuthToken) {
+                            await signInWithCustomToken(auth, initialAuthToken).catch(error => console.error("Firebase Auth Error:", error));
+                        } else {
+                            await signInAnonymously(auth).catch(error => console.error("Firebase Auth Error:", error));
+                        }
+                    }
+                });
 
-    items.forEach(item => {
-      item.addEventListener('dragstart', (e) => {
-        e.dataTransfer.setData('text/plain', e.target.id);
-        setTimeout(() => e.target.classList.add('hidden'), 0);
-      });
-    });
+                const playButton = document.getElementById('playButton');
+                playButton.addEventListener('click', async () => {
+                    const playerName = document.getElementById('playerName').value;
+                    if (playerName.trim() !== '') {
+                        const playerRef = doc(db, `artifacts/${appId}/public/data/players`, userId);
+                        await setDoc(playerRef, { name: playerName, score: 0 });
+                        document.getElementById('welcome-screen').classList.add('hidden');
+                        document.getElementById('game-screen').classList.remove('hidden');
+                        shuffleItems();
+                    }
+                });
 
-    bins.forEach(bin => {
-      bin.addEventListener('dragover', e => e.preventDefault());
-      bin.addEventListener('drop', async (e) => {
-        e.preventDefault();
-        const itemId = e.dataTransfer.getData('text/plain');
-        const item = document.getElementById(itemId);
-        const itemsContainer = document.getElementById('items-container');
+                function shuffleItems() {
+                    const itemsContainer = document.getElementById('items-container');
+                    const items = Array.from(itemsContainer.children);
+                    shuffleArray(items);
+                    items.forEach(item => itemsContainer.appendChild(item));
+                }
 
-        if (item.dataset.type === bin.dataset.type) {
-          await updatePlayerScore(10);
-          item.remove();
-          const checkmark = document.getElementById('checkmark');
-          checkmark.classList.remove('hidden');
-          setTimeout(() => checkmark.classList.add('hidden'), 500);
-        } else {
-          item.classList.remove('hidden');
-          itemsContainer.appendChild(item);
-          const crossmark = document.getElementById('crossmark');
-          crossmark.classList.remove('hidden');
-          setTimeout(() => crossmark.classList.add('hidden'), 500);
+                // Drag and Drop Logic
+                const items = document.querySelectorAll('.draggable');
+                const bins = document.querySelectorAll('.droppable');
+
+                items.forEach(item => {
+                    item.addEventListener('dragstart', (e) => {
+                        e.dataTransfer.setData('text/plain', e.target.id);
+                        setTimeout(() => e.target.classList.add('hidden'), 0);
+                    });
+                });
+
+                bins.forEach(bin => {
+                    bin.addEventListener('dragover', (e) => e.preventDefault());
+                    bin.addEventListener('drop', (e) => {
+                        e.preventDefault();
+                        const itemId = e.dataTransfer.getData('text/plain');
+                        const item = document.getElementById(itemId);
+                        const itemsContainer = document.getElementById('items-container');
+
+                        if (item.dataset.type === bin.dataset.type) {
+                            // Correct drop
+                            updatePlayerScore(10);
+                            item.parentNode.removeChild(item);
+                            // Show a temporary success message/animation
+                            const checkmark = document.getElementById('checkmark');
+                            checkmark.classList.remove('hidden');
+                            setTimeout(() => checkmark.classList.add('hidden'), 500);
+                        } else {
+                            // Incorrect drop, return item to original position and show error
+                            item.classList.remove('hidden');
+                            itemsContainer.appendChild(item); // Retorna o item para a área de itens
+                            const crossmark = document.getElementById('crossmark');
+                            crossmark.classList.remove('hidden');
+                            setTimeout(() => crossmark.classList.add('hidden'), 500);
+                        }
+                    });
+                });
+            };
+            document.head.appendChild(chartScript);
+        });
+
+        async function setupRealtimeListeners(scoreChart) {
+            const playersRef = collection(db, `artifacts/${appId}/public/data/players`);
+            onSnapshot(playersRef, (querySnapshot) => {
+                const players = {};
+                querySnapshot.forEach((doc) => {
+                    players[doc.id] = doc.data();
+                });
+                updateScoreboard(players, scoreChart);
+            });
         }
-      });
-    });
-  };
-  document.head.appendChild(chartScript);
-});
 
-async function setupRealtimeListeners(scoreChart) {
-  const playersRef = collection(db, `artifacts/${__app_id}/public/data/players`);
-  onSnapshot(playersRef, (snapshot) => {
-    const players = {};
-    snapshot.forEach(doc => { players[doc.id] = doc.data(); });
-    updateScoreboard(players, scoreChart);
-  });
-}
+        async function updatePlayerScore(score) {
+            const playerRef = doc(db, `artifacts/${appId}/public/data/players`, userId);
+            try {
+                const playerDoc = await getDoc(playerRef);
+                const currentScore = playerDoc.exists() ? playerDoc.data().score : 0;
+                await setDoc(playerRef, {
+                    name: document.getElementById('playerName').value,
+                    score: currentScore + score
+                }, { merge: true });
+            } catch (error) {
+                console.error("Erro ao atualizar a pontuação: ", error);
+            }
+        }
 
-async function updatePlayerScore(score) {
-  const playerRef = doc(db, `artifacts/${__app_id}/public/data/players`, userId);
-  const playerDoc = await getDoc(playerRef);
-  const currentScore = playerDoc.exists() ? playerDoc.data().score : 0;
-  await setDoc(playerRef, { name: document.getElementById('playerName').value, score: currentScore + score }, { merge: true });
-}
+        function updateScoreboard(players, scoreChart) {
+            const scoreboard = document.getElementById('scoreboard-list');
+            const sortedPlayers = Object.values(players).sort((a, b) => b.score - a.score);
+            scoreboard.innerHTML = sortedPlayers.map(p => `
+                <li class="flex items-center justify-between p-2 rounded-lg bg-gray-100 mb-2">
+                    <span class="font-semibold">${p.name}</span>
+                    <span class="text-lg font-bold text-green-600">${p.score}</span>
+                </li>
+            `).join('');
 
-function updateScoreboard(players, scoreChart) {
-  const scoreboard = document.getElementById('scoreboard-list');
-  const sortedPlayers = Object.values(players).sort((a, b) => b.score - a.score);
-  scoreboard.innerHTML = sortedPlayers.map(p => `
-    <li class="flex items-center justify-between p-2 rounded-lg bg-gray-100 mb-2">
-      <span class="font-semibold">${p.name}</span>
-      <span class="text-lg font-bold text-green-600">${p.score}</span>
-    </li>`).join('');
-
-  const names = sortedPlayers.map(p => p.name);
-  const scores = sortedPlayers.map(p => p.score);
-  scoreChart.data.labels = names;
-  scoreChart.data.datasets[0].data = scores;
-  scoreChart.update();
-}
-</script>
+            // Update Chart
+            const names = sortedPlayers.map(p => p.name);
+            const scores = sortedPlayers.map(p => p.score);
+            scoreChart.data.labels = names;
+            scoreChart.data.datasets[0].data = scores;
+            scoreChart.update();
+        }
+    </script>
 </head>
 <body class="bg-gray-50 font-sans text-gray-800">
-<div class="container mx-auto p-4 md:p-8 flex flex-col items-center min-h-screen">
-<h1 class="text-4xl md:text-5xl font-extrabold text-blue-600 my-8 text-center">Jogo da Reciclagem</h1>
-<div id="welcome-screen" class="flex flex-col items-center justify-center p-8 bg-white rounded-2xl shadow-xl w-full max-w-md hidden">
-<h2 class="text-2xl font-bold mb-4 text-center">Bem-vindo(a)!</h2>
-<p class="mb-6 text-center">Entre com seu nome para começar a jogar.</p>
-<input type="text" id="playerName" placeholder="Seu nome" class="w-full p-3 mb-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-<button id="playButton" class="w-full py-3 bg-green-500 text-white font-bold rounded-lg shadow-md hover:bg-green-600 transition-colors">Entrar</button>
-</div>
-<div id="game-screen" class="hidden w-full max-w-7xl flex flex-col lg:flex-row gap-8">
-<div class="w-full lg:w-2/3 bg-white p-6 rounded-2xl shadow-xl flex flex-col items-center">
-<h2 class="text-3xl font-bold mb-6 text-center">Qual é a lixeira correta?</h2>
-<div class="w-full grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-8 justify-items-center">
-<!-- Lixeiras -->
-<div class="flex flex-col items-center droppable p-2 rounded-lg" data-type="plastic"><img src="https://placehold.co/100x150/ef4444/ffffff?text=Plastico" alt="Lixeira Vermelha" class="w-16 h-24 mb-2 rounded-lg"><span class="text-sm font-semibold text-center">Plástico</span></div>
-<div class="flex flex-col items-center droppable p-2 rounded-lg" data-type="paper"><img src="https://placehold.co/100x150/3b82f6/ffffff?text=Papel" alt="Lixeira Azul" class="w-16 h-24 mb-2 rounded-lg"><span class="text-sm font-semibold text-center">Papel</span></div>
-<div class="flex flex-col items-center droppable p-2 rounded-lg" data-type="metal"><img src="https://placehold.co/100x150/f59e0b/ffffff?text=Metal" alt="Lixeira Amarela" class="w-16 h-24 mb-2 rounded-lg"><span class="text-sm font-semibold text-center">Metal</span></div>
-<div class="flex flex-col items-center droppable p-2 rounded-lg" data-type="glass"><img src="https://placehold.co/100x150/22c55e/ffffff?text=Vidro" alt="Lixeira Verde" class="w-16 h-24 mb-2 rounded-lg"><span class="text-sm font-semibold text-center">Vidro</span></div>
-<div class="flex flex-col items-center droppable p-2 rounded-lg" data-type="organic"><img src="https://placehold.co/100x150/92400e/ffffff?text=Organico" alt="Lixeira Marrom" class="w-16 h-24 mb-2 rounded-lg"><span class="text-sm font-semibold text-center">Orgânico</span></div>
-<div class="flex flex-col items-center droppable p-2 rounded-lg" data-type="non-recyclable"><img src="https://placehold.co/100x150/333333/ffffff?text=Nao-Reciclavel" alt="Lixeira Preta" class="w-16 h-24 mb-2 rounded-lg"><span class="text-sm font-semibold text-center">Não-Reciclável</span></div>
-</div>
-<div id="
+    <div class="container mx-auto p-4 md:p-8 flex flex-col items-center min-h-screen">
+        <h1 class="text-4xl md:text-5xl font-extrabold text-blue-600 my-8 text-center">Jogo da Reciclagem</h1>
+
+        <!-- Welcome Screen -->
+        <div id="welcome-screen" class="flex flex-col items-center justify-center p-8 bg-white rounded-2xl shadow-xl w-full max-w-md">
+            <h2 class="text-2xl font-bold mb-4 text-center">Bem-vindo(a)!</h2>
+            <p class="mb-6 text-center">Entre com seu nome para começar a jogar.</p>
+            <input type="text" id="playerName" placeholder="Seu nome" class="w-full p-3 mb-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <button id="playButton" class="w-full py-3 bg-green-500 text-white font-bold rounded-lg shadow-md hover:bg-green-600 transition-colors">Entrar</button>
+        </div>
+
+        <!-- Game Screen -->
+        <div id="game-screen" class="hidden w-full max-w-7xl flex flex-col lg:flex-row gap-8">
+            <!-- Game Area -->
+            <div class="w-full lg:w-2/3 bg-white p-6 rounded-2xl shadow-xl flex flex-col items-center">
+                <h2 class="text-3xl font-bold mb-6 text-center">Qual é a lixeira correta?</h2>
+                <div class="w-full grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-8 justify-items-center">
+                    <!-- Lixeiras -->
+                    <div class="flex flex-col items-center droppable p-2 rounded-lg" data-type="plastic">
+                        <img src="https://placehold.co/100x150/ef4444/ffffff?text=Plastico" alt="Lixeira Vermelha" class="w-16 h-24 mb-2 rounded-lg">
+                        <span class="text-sm font-semibold text-center">Plástico</span>
+                    </div>
+                    <div class="flex flex-col items-center droppable p-2 rounded-lg" data-type="paper">
+                        <img src="https://placehold.co/100x150/3b82f6/ffffff?text=Papel" alt="Lixeira Azul" class="w-16 h-24 mb-2 rounded-lg">
+                        <span class="text-sm font-semibold text-center">Papel</span>
+                    </div>
+                    <div class="flex flex-col items-center droppable p-2 rounded-lg" data-type="metal">
+                        <img src="https://placehold.co/100x150/f59e0b/ffffff?text=Metal" alt="Lixeira Amarela" class="w-16 h-24 mb-2 rounded-lg">
+                        <span class="text-sm font-semibold text-center">Metal</span>
+                    </div>
+                    <div class="flex flex-col items-center droppable p-2 rounded-lg" data-type="glass">
+                        <img src="https://placehold.co/100x150/22c55e/ffffff?text=Vidro" alt="Lixeira Verde" class="w-16 h-24 mb-2 rounded-lg">
+                        <span class="text-sm font-semibold text-center">Vidro</span>
+                    </div>
+                    <div class="flex flex-col items-center droppable p-2 rounded-lg" data-type="organic">
+                         <img src="https://placehold.co/100x150/92400e/ffffff?text=Organico" alt="Lixeira Marrom" class="w-16 h-24 mb-2 rounded-lg">
+                        <span class="text-sm font-semibold text-center">Orgânico</span>
+                    </div>
+                    <div class="flex flex-col items-center droppable p-2 rounded-lg" data-type="non-recyclable">
+                        <img src="https://placehold.co/100x150/333333/ffffff?text=Nao-Reciclavel" alt="Lixeira Preta" class="w-16 h-24 mb-2 rounded-lg">
+                        <span class="text-sm font-semibold text-center">Não-Reciclável</span>
+                    </div>
+                </div>
+
+                <!-- Itens para arrastar -->
+                <div id="items-container" class="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4 mb-8">
+                    <!-- Itens de Plástico -->
+                    <div id="item-plastic-1" class="draggable p-3 rounded-lg cursor-grab active:cursor-grabbing transform transition-transform hover:scale-105" draggable="true" data-type="plastic">
+                        <span class="text-xl">🥛</span>
+                        <p class="text-xs text-center mt-1">Garrafa PET</p>
+                    </div>
+                    <div id="item-plastic-2" class="draggable p-3 rounded-lg cursor-grab active:cursor-grabbing transform transition-transform hover:scale-105" draggable="true" data-type="plastic">
+                        <span class="text-xl">🛍️</span>
+                        <p class="text-xs text-center mt-1">Saco plástico</p>
+                    </div>
+                    <div id="item-plastic-3" class="draggable p-3 rounded-lg cursor-grab active:cursor-grabbing transform transition-transform hover:scale-105" draggable="true" data-type="plastic">
+                        <span class="text-xl">🥤</span>
+                        <p class="text-xs text-center mt-1">Copo plástico</p>
+                    </div>
+                    <div id="item-plastic-4" class="draggable p-3 rounded-lg cursor-grab active:cursor-grabbing transform transition-transform hover:scale-105" draggable="true" data-type="plastic">
+                        <span class="text-xl">🧴</span>
+                        <p class="text-xs text-center mt-1">Pote de shampoo</p>
+                    </div>
+
+                    <!-- Itens de Papel -->
+                    <div id="item-paper-1" class="draggable p-3 rounded-lg cursor-grab active:cursor-grabbing transform transition-transform hover:scale-105" draggable="true" data-type="paper">
+                        <span class="text-xl">🗞️</span>
+                        <p class="text-xs text-center mt-1">Jornal</p>
+                    </div>
+                    <div id="item-paper-2" class="draggable p-3 rounded-lg cursor-grab active:cursor-grabbing transform transition-transform hover:scale-105" draggable="true" data-type="paper">
+                        <span class="text-xl">📦</span>
+                        <p class="text-xs text-center mt-1">Caixa de papelão</p>
+                    </div>
+                    <div id="item-paper-3" class="draggable p-3 rounded-lg cursor-grab active:cursor-grabbing transform transition-transform hover:scale-105" draggable="true" data-type="paper">
+                        <span class="text-xl">📄</span>
+                        <p class="text-xs text-center mt-1">Folha de papel</p>
+                    </div>
+
+                    <!-- Itens de Metal -->
+                    <div id="item-metal-1" class="draggable p-3 rounded-lg cursor-grab active:cursor-grabbing transform transition-transform hover:scale-105" draggable="true" data-type="metal">
+                        <span class="text-xl">🥫</span>
+                        <p class="text-xs text-center mt-1">Lata de conserva</p>
+                    </div>
+                    <div id="item-metal-2" class="draggable p-3 rounded-lg cursor-grab active:cursor-grabbing transform transition-transform hover:scale-105" draggable="true" data-type="metal">
+                        <span class="text-xl">🥤</span>
+                        <p class="text-xs text-center mt-1">Lata de refri</p>
+                    </div>
+                    <div id="item-metal-3" class="draggable p-3 rounded-lg cursor-grab active:cursor-grabbing transform transition-transform hover:scale-105" draggable="true" data-type="metal">
+                        <span class="text-xl">🔩</span>
+                        <p class="text-xs text-center mt-1">Arame</p>
+                    </div>
+
+                    <!-- Itens de Vidro -->
+                    <div id="item-glass-1" class="draggable p-3 rounded-lg cursor-grab active:cursor-grabbing transform transition-transform hover:scale-105" draggable="true" data-type="glass">
+                        <span class="text-xl">🍾</span>
+                        <p class="text-xs text-center mt-1">Garrafa de vidro</p>
+                    </div>
+                    <div id="item-glass-2" class="draggable p-3 rounded-lg cursor-grab active:cursor-grabbing transform transition-transform hover:scale-105" draggable="true" data-type="glass">
+                        <span class="text-xl">🫙</span>
+                        <p class="text-xs text-center mt-1">Pote de conserva</p>
+                    </div>
+                    <div id="item-glass-3" class="draggable p-3 rounded-lg cursor-grab active:cursor-grabbing transform transition-transform hover:scale-105" draggable="true" data-type="glass">
+                        <span class="text-xl">🥂</span>
+                        <p class="text-xs text-center mt-1">Copo de vidro</p>
+                    </div>
+
+                    <!-- Itens Orgânicos -->
+                    <div id="item-organic-1" class="draggable p-3 rounded-lg cursor-grab active:cursor-grabbing transform transition-transform hover:scale-105" draggable="true" data-type="organic">
+                        <span class="text-xl">🍎</span>
+                        <p class="text-xs text-center mt-1">Maçã</p>
+                    </div>
+                    <div id="item-organic-2" class="draggable p-3 rounded-lg cursor-grab active:cursor-grabbing transform transition-transform hover:scale-105" draggable="true" data-type="organic">
+                        <span class="text-xl">🍌</span>
+                        <p class="text-xs text-center mt-1">Casca de banana</p>
+                    </div>
+                    <div id="item-organic-3" class="draggable p-3 rounded-lg cursor-grab active:cursor-grabbing transform transition-transform hover:scale-105" draggable="true" data-type="organic">
+                        <span class="text-xl">🍂</span>
+                        <p class="text-xs text-center mt-1">Folhas secas</p>
+                    </div>
+                    <div id="item-organic-4" class="draggable p-3 rounded-lg cursor-grab active:cursor-grabbing transform transition-transform hover:scale-105" draggable="true" data-type="organic">
+                        <span class="text-xl">🍗</span>
+                        <p class="text-xs text-center mt-1">Restos de comida</p>
+                    </div>
+
+                    <!-- Itens Não-Recicláveis -->
+                    <div id="item-non-recyclable-1" class="draggable p-3 rounded-lg cursor-grab active:cursor-grabbing transform transition-transform hover:scale-105" draggable="true" data-type="non-recyclable">
+                        <span class="text-xl">🔋</span>
+                        <p class="text-xs text-center mt-1">Pilha</p>
+                    </div>
+                    <div id="item-non-recyclable-2" class="draggable p-3 rounded-lg cursor-grab active:cursor-grabbing transform transition-transform hover:scale-105" draggable="true" data-type="non-recyclable">
+                        <span class="text-xl">💡</span>
+                        <p class="text-xs text-center mt-1">Lâmpada</p>
+                    </div>
+                    <div id="item-non-recyclable-3" class="draggable p-3 rounded-lg cursor-grab active:cursor-grabbing transform transition-transform hover:scale-105" draggable="true" data-type="non-recyclable">
+                        <span class="text-xl">🪞</span>
+                        <p class="text-xs text-center mt-1">Espelho</p>
+                    </div>
+                    <div id="item-non-recyclable-4" class="draggable p-3 rounded-lg cursor-grab active:cursor-grabbing transform transition-transform hover:scale-105" draggable="true" data-type="non-recyclable">
+                        <span class="text-xl">🚼</span>
+                        <p class="text-xs text-center mt-1">Fralda</p>
+                    </div>
+                </div>
+
+                <!-- Success Message -->
+                <div id="checkmark" class="fixed inset-0 flex items-center justify-center bg-green-500 bg-opacity-75 z-50 hidden">
+                    <svg class="animate-bounce w-20 h-20 text-white" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                    </svg>
+                </div>
+                <!-- Error Message -->
+                <div id="crossmark" class="fixed inset-0 flex items-center justify-center bg-red-500 bg-opacity-75 z-50 hidden">
+                    <svg class="animate-bounce w-20 h-20 text-white" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Scoreboard and Graph -->
+            <div class="w-full lg:w-1/3 flex flex-col gap-8">
+                <!-- Scoreboard -->
+                <div class="bg-white p-6 rounded-2xl shadow-xl flex-1">
+                    <h3 class="text-2xl font-bold mb-4 text-center">Placar</h3>
+                    <ul id="scoreboard-list" class="space-y-2">
+                        <!-- Scoreboard items will be rendered here -->
+                    </ul>
+                </div>
+
+                <!-- Graph -->
+                <div class="bg-white p-6 rounded-2xl shadow-xl flex-1">
+                    <h3 class="text-2xl font-bold mb-4 text-center">Progresso</h3>
+                    <canvas id="scoreChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
