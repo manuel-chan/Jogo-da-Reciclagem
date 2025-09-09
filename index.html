@@ -44,56 +44,49 @@
                 playButton.disabled = playerNameInput.value.trim() === '';
             });
             
-            if (!hasFirebase) {
-                console.error("Erro: Firebase não inicializado. O jogo precisa de uma conexão com o banco de dados para funcionar.");
-                playButton.disabled = true;
-                playButton.textContent = "Erro: Jogo offline";
-                return;
-            } else {
-                const app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
+            const app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
 
-                playButton.disabled = true;
-                playButton.textContent = "Carregando...";
+            playButton.disabled = true;
+            playButton.textContent = "Carregando...";
 
-                onAuthStateChanged(auth, async (user) => {
-                    playButton.disabled = playerNameInput.value.trim() === '';
-                    playButton.textContent = "Entrar";
+            onAuthStateChanged(auth, async (user) => {
+                playButton.disabled = playerNameInput.value.trim() === '';
+                playButton.textContent = "Entrar";
 
-                    if (user) {
-                        userId = user.uid;
-                        console.log('User signed in with ID:', userId);
-                        setupRealtimeListeners();
-                        isGameReady = true;
+                if (user) {
+                    userId = user.uid;
+                    console.log('User signed in with ID:', userId);
+                    setupRealtimeListeners();
+                    isGameReady = true;
+                } else {
+                    console.log('Signing in...');
+                    if (initialAuthToken) {
+                        await signInWithCustomToken(auth, initialAuthToken).catch(error => console.error("Firebase Auth Error:", error));
                     } else {
-                        console.log('Signing in...');
-                        if (initialAuthToken) {
-                            await signInWithCustomToken(auth, initialAuthToken).catch(error => console.error("Firebase Auth Error:", error));
-                        } else {
-                            await signInAnonymously(auth).catch(error => console.error("Firebase Auth Error:", error));
-                        }
+                        await signInAnonymously(auth).catch(error => console.error("Firebase Auth Error:", error));
                     }
-                });
+                }
+            });
 
-                playButton.addEventListener('click', async () => {
-                    const playerName = playerNameInput.value;
-                    if (playerName.trim() !== '' && isGameReady) {
-                        const playerRef = doc(db, `artifacts/${appId}/public/data/players`, userId);
-                        await setDoc(playerRef, { name: playerName, score: 0 });
-                        welcomeScreen.classList.add('hidden');
-                        lobbyScreen.classList.remove('hidden');
-                        document.getElementById('playerNameDisplay').textContent = playerName;
-                    }
-                });
+            playButton.addEventListener('click', async () => {
+                const playerName = playerNameInput.value;
+                if (playerName.trim() !== '' && isGameReady) {
+                    const playerRef = doc(db, `artifacts/${appId}/public/data/players`, userId);
+                    await setDoc(playerRef, { name: playerName, score: 0 });
+                    welcomeScreen.classList.add('hidden');
+                    lobbyScreen.classList.remove('hidden');
+                    document.getElementById('playerNameDisplay').textContent = playerName;
+                }
+            });
 
-                startLobbyButton.addEventListener('click', () => {
-                    lobbyScreen.classList.add('hidden');
-                    gameScreen.classList.remove('hidden');
-                    shuffleItems();
-                    startTimer();
-                });
-            }
+            startLobbyButton.addEventListener('click', () => {
+                lobbyScreen.classList.add('hidden');
+                gameScreen.classList.remove('hidden');
+                shuffleItems();
+                startTimer();
+            });
         }
 
         document.addEventListener('DOMContentLoaded', initGame);
