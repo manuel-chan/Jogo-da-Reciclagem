@@ -140,7 +140,6 @@
                 e.preventDefault();
                 const itemId = e.dataTransfer.getData('text/plain');
                 const item = document.getElementById(itemId);
-                const itemsContainer = document.getElementById('items-container');
 
                 if (item.dataset.type === bin.dataset.type) {
                     // Correct drop
@@ -151,11 +150,14 @@
                     setTimeout(() => checkmark.classList.add('hidden'), 500);
                 } else {
                     // Incorrect drop
-                    item.classList.remove('hidden');
-                    itemsContainer.appendChild(item);
+                    item.parentNode.removeChild(item);
                     const crossmark = document.getElementById('crossmark');
                     crossmark.classList.remove('hidden');
                     setTimeout(() => crossmark.classList.add('hidden'), 500);
+                }
+                const remainingItems = document.getElementById('items-container').querySelectorAll('.draggable').length;
+                if (remainingItems === 0) {
+                    endGame();
                 }
             });
         });
