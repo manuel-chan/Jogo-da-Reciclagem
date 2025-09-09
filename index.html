@@ -19,6 +19,7 @@
         let db, auth;
         let userId;
         let scoreChart;
+        let isGameReady = false;
 
         function shuffleArray(array) {
             for (let i = array.length - 1; i > 0; i--) {
@@ -32,12 +33,15 @@
             const playButton = document.getElementById('playButton');
             const welcomeScreen = document.getElementById('welcome-screen');
             const gameScreen = document.getElementById('game-screen');
-            const scoreSection = document.getElementById('scoreboard-section');
+            const scoreboardList = document.getElementById('scoreboard-list');
             const playerNameInput = document.getElementById('playerName');
 
+            playerNameInput.addEventListener('input', () => {
+                playButton.disabled = playerNameInput.value.trim() === '';
+            });
+            
             if (!hasFirebase) {
                 console.warn("Firebase não inicializado. O jogo rodará em modo offline.");
-                scoreSection.classList.add('hidden');
                 playButton.addEventListener('click', () => {
                     const playerName = playerNameInput.value;
                     if (playerName.trim() !== '') {
@@ -55,13 +59,14 @@
                 playButton.textContent = "Carregando...";
 
                 onAuthStateChanged(auth, async (user) => {
-                    playButton.disabled = false;
+                    playButton.disabled = playerNameInput.value.trim() === '';
                     playButton.textContent = "Entrar";
 
                     if (user) {
                         userId = user.uid;
                         console.log('User signed in with ID:', userId);
                         setupRealtimeListeners();
+                        isGameReady = true;
                     } else {
                         console.log('Signing in...');
                         if (initialAuthToken) {
@@ -74,7 +79,7 @@
 
                 playButton.addEventListener('click', async () => {
                     const playerName = playerNameInput.value;
-                    if (playerName.trim() !== '' && userId) {
+                    if (playerName.trim() !== '' && isGameReady) {
                         const playerRef = doc(db, `artifacts/${appId}/public/data/players`, userId);
                         await setDoc(playerRef, { name: playerName, score: 0 });
                         welcomeScreen.classList.add('hidden');
@@ -142,6 +147,7 @@
                     players[doc.id] = doc.data();
                 });
                 updateScoreboard(players);
+                updatePlayersList(players);
             });
         }
 
@@ -173,6 +179,13 @@
                 </li>
             `).join('');
         }
+        
+        function updatePlayersList(players) {
+            const playersList = document.getElementById('players-list');
+            playersList.innerHTML = Object.values(players).map(p => `
+                <li class="p-2 rounded-lg bg-gray-100 text-center">${p.name}</li>
+            `).join('');
+        }
     </script>
 </head>
 <body class="bg-gray-50 font-sans text-gray-800">
@@ -185,6 +198,13 @@
             <p class="mb-6 text-center">Entre com seu nome para começar a jogar.</p>
             <input type="text" id="playerName" placeholder="Seu nome" class="w-full p-3 mb-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
             <button id="playButton" class="w-full py-3 bg-green-500 text-white font-bold rounded-lg shadow-md hover:bg-green-600 transition-colors">Entrar</button>
+            
+            <div id="players-online-section" class="w-full mt-6">
+                <h3 class="text-xl font-bold mb-2 text-center">Jogadores Online</h3>
+                <ul id="players-list" class="space-y-2">
+                    <!-- Player names will be rendered here -->
+                </ul>
+            </div>
         </div>
 
         <!-- Game Screen -->
