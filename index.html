@@ -63,6 +63,10 @@
 
                 // Use onAuthStateChanged to ensure auth is ready before proceeding
                 onAuthStateChanged(auth, async (user) => {
+                    const playButton = document.getElementById('playButton');
+                    playButton.disabled = false;
+                    playButton.textContent = "Entrar";
+
                     if (user) {
                         userId = user.uid;
                         console.log('User signed in with ID:', userId);
@@ -70,6 +74,8 @@
                         setupRealtimeListeners(scoreChart);
                     } else {
                         console.log('Signing in...');
+                        playButton.disabled = true;
+                        playButton.textContent = "Carregando...";
                         if (initialAuthToken) {
                             await signInWithCustomToken(auth, initialAuthToken).catch(error => console.error("Firebase Auth Error:", error));
                         } else {
@@ -358,8 +364,5 @@
             </div>
         </div>
     </div>
-</body>
-</html>
-
 </body>
 </html>
